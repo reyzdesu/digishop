@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Riwayat — DigiShop</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{font-family:'Plus Jakarta Sans',sans-serif}
+    body{background:#0f0f1a;min-height:100vh}
+    .anim-up{animation:up .4s cubic-bezier(.16,1,.3,1) forwards;opacity:0;transform:translateY(16px)}
+    @keyframes up{to{opacity:1;transform:translateY(0)}}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React
+
+const StatusBadge = ({ status }) => {
+  const map = {
+    pending:   { label: 'Pending',   bg: 'bg-amber-500/10',  border: 'border-amber-500/20',  text: 'text-amber-400' },
+    completed: { label: 'Selesai',   bg: 'bg-emerald-500/10',border: 'border-emerald-500/20',text: 'text-emerald-400' },
+    failed:    { label: 'Gagal',     bg: 'bg-red-500/10',    border: 'border-red-500/20',    text: 'text-red-400' },
+    canceled:  { label: 'Dibatalkan',bg: 'bg-slate-500/10',  border: 'border-slate-500/20',  text: 'text-slate-400' },
+    expired:   { label: 'Kadaluarsa',bg: 'bg-slate-500/10',  border: 'border-slate-500/20',  text: 'text-slate-400' },
+  }
+  const s = map[status] || map.expired
+  return (
+    <span className={`${s.bg} border ${s.border} ${s.text} text-[10px] font-bold px-2 py-0.5 rounded-full`}>
+      {s.label}
+    </span>
+  )
+}
+
+const App = () => {
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const ids = JSON.parse(localStorage.getItem('digishop_hist') || '[]')
+    if (!ids.length) { setLoading(false); return }
+    Promise.all(ids.map(id =>
+      fetch(`/api/order/${id}`).then(r => r.json()).then(j => j.success ? j.data : { orderId: id, status: 'expired' })
+    )).then(list => {
+      setOrders(list)
+      setLoading(false)
+    })
+  }, [])
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0f0f1a]/90 backdrop-blur px-4 h-16 flex items-center justify-between">
+        <a href="/" className="text-white/40 hover:text-white transition text-sm font-medium">← Kembali</a>
+        <span className="text-white font-black text-base">Riwayat Order</span>
+        <div className="w-12"></div>
+      </nav>
+
+      <div className="w-full max-w-lg mx-auto px-4 pt-6 pb-12">
+        {loading ? (
+          <div className="text-center py-16">
+            <div className="w-10 h-10 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-white/20 text-sm">Memuat riwayat...</p>
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-5xl mb-4">📭</div>
+            <p className="text-white/30 font-bold mb-2">Belum ada riwayat order</p>
+            <a href="/" className="text-indigo-400 text-sm hover:text-indigo-300 transition">Mulai belanja →</a>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {orders.map((o, i) => (
+              <div
+                key={o.orderId}
+                className="bg-[#16162a] rounded-2xl p-4 anim-up"
+                style={{ animationDelay: `${i * 0.04}s`, boxShadow:'0 0 0 1px rgba(255,255,255,.05)' }}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">{o.productEmoji || '📦'}</span>
+                    <div>
+                      <p className="text-white font-bold text-sm">{o.productName || 'Produk'}</p>
+                      <p className="text-white/30 text-xs">{o.buyerName || '—'}</p>
+                    </div>
+                  </div>
+                  <StatusBadge status={o.status} />
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-white/30">
+                  <span>Rp {o.amount?.toLocaleString() || '—'}</span>
+                  <span>{o.duration} {o.durationType}</span>
+                  <span>{o.createdAt ? new Date(o.createdAt).toLocaleDateString('id-ID') : '—'}</span>
+                </div>
+
+                {o.status === 'completed' && o.expiredAt && (
+                  <div className="mt-2 text-xs text-amber-400/60">
+                    📅 Exp: {o.expiredAt}
+                  </div>
+                )}
+
+                {o.status === 'pending' && (
+                  <a href={`/payment/${o.orderId}`}
+                    className="mt-3 block w-full py-2 text-center text-xs font-bold rounded-xl text-indigo-300 border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 transition"
+                  >
+                    Lanjutkan Pembayaran →
+                  </a>
+                )}
+                {o.status === 'completed' && (
+                  <a href={`/success/${o.orderId}`}
+                    className="mt-3 block w-full py-2 text-center text-xs font-bold rounded-xl text-emerald-300 border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition"
+                  >
+                    Lihat Detail →
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />)
+</script>
+</body>
+</html>

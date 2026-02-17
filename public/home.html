@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DigiShop</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{font-family:'Plus Jakarta Sans',sans-serif}
+    body{background:#0f0f1a;-webkit-tap-highlight-color:transparent;min-height:100vh}
+    .card-glow{box-shadow:0 0 0 1px rgba(99,102,241,.15),0 4px 32px rgba(99,102,241,.08)}
+    .card-glow:hover{box-shadow:0 0 0 1px rgba(99,102,241,.4),0 8px 40px rgba(99,102,241,.15)}
+    .badge-stock{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.25)}
+    .badge-stock.empty{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2)}
+    .anim-up{animation:up .5s cubic-bezier(.16,1,.3,1) forwards;opacity:0;transform:translateY(24px)}
+    @keyframes up{to{opacity:1;transform:translateY(0)}}
+    .shine{background:linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent);background-size:200% 100%;animation:shine 2s infinite}
+    @keyframes shine{0%{background-position:-200% 0}100%{background-position:200% 0}}
+    .gradient-text{background:linear-gradient(135deg,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .btn-primary{background:linear-gradient(135deg,#6366f1,#8b5cf6);transition:all .2s;box-shadow:0 4px 20px rgba(99,102,241,.3)}
+    .btn-primary:hover{box-shadow:0 6px 28px rgba(99,102,241,.5);transform:translateY(-1px)}
+    .btn-primary:active{transform:scale(.97)}
+    .modal-bg{background:rgba(0,0,0,.7);backdrop-filter:blur(8px)}
+    input{caret-color:#818cf8}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#333;border-radius:4px}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React
+
+const App = () => {
+  const [config, setConfig] = useState({ products: {}, contacts: {}, shopName: 'DigiShop' })
+  const [modal, setModal] = useState(null)
+  const [buyerName, setBuyerName] = useState('')
+  const [tgId, setTgId] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [filter, setFilter] = useState('all')
+
+  useEffect(() => {
+    fetch('/api/config').then(r => r.json()).then(setConfig)
+  }, [])
+
+  const categories = [
+    { key: 'all', label: 'Semua' },
+    { key: 'music', label: '🎵 Music' },
+    { key: 'design', label: '🎨 Design' },
+    { key: 'video', label: '🎬 Video' },
+    { key: 'other', label: '📦 Lainnya' },
+  ]
+
+  const buy = async () => {
+    if (!buyerName.trim() || buyerName.trim().length < 2)
+      return alert('Nama minimal 2 karakter!')
+    setLoading(true)
+    try {
+      const res = await fetch('/api/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ buyerName: buyerName.trim(), productId: modal.id, telegramId: tgId || null })
+      })
+      const json = await res.json()
+      if (json.success) {
+        const hist = JSON.parse(localStorage.getItem('digishop_hist') || '[]')
+        hist.unshift(json.orderId)
+        localStorage.setItem('digishop_hist', JSON.stringify(hist.slice(0, 50)))
+        window.location.href = `/payment/${json.orderId}`
+      } else {
+        alert(json.msg || 'Gagal membuat order')
+      }
+    } catch { alert('Koneksi bermasalah, coba lagi') }
+    setLoading(false)
+  }
+
+  const prods = Object.entries(config.products)
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      {/* Navbar */}
+      <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0f0f1a]/90 backdrop-blur px-4 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-base font-black text-white shadow-lg shadow-indigo-500/30">D</div>
+          <span className="font-extrabold text-white text-lg tracking-tight">{config.shopName}</span>
+        </div>
+        <a href="/history" className="text-xs font-bold text-white/50 hover:text-white transition px-3 py-1.5 rounded-lg hover:bg-white/5">History</a>
+      </nav>
+
+      {/* Hero */}
+      <div className="px-4 pt-10 pb-6 text-center anim-up" style={{animationDelay:'0s'}}>
+        <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full px-4 py-1.5 text-xs font-bold text-indigo-300 mb-4">
+          ⚡ Auto Delivery · Instant
+        </div>
+        <h1 className="text-3xl font-black text-white leading-tight mb-2">
+          Akun Premium<br/><span className="gradient-text">Harga Terjangkau</span>
+        </h1>
+        <p className="text-white/40 text-sm">Bayar QRIS · Auto kirim · Bergaransi</p>
+      </div>
+
+      {/* Products Grid */}
+      <div className="w-full max-w-2xl mx-auto px-4 pb-24 flex-1">
+        {prods.length === 0 ? (
+          <div className="text-center py-16 text-white/20">
+            <div className="text-5xl mb-3">🛒</div>
+            <p className="font-bold">Belum ada produk tersedia</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {prods.map(([id, p], i) => (
+              <div
+                key={id}
+                className="card-glow bg-[#16162a] rounded-2xl p-5 flex flex-col transition-all duration-200 cursor-pointer anim-up"
+                style={{ animationDelay: `${0.05 + i * 0.04}s` }}
+                onClick={() => p.stock > 0 && setModal({ id, ...p })}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <span className="text-3xl">{p.emoji || '📦'}</span>
+                  <span className={`badge-stock ${p.stock === 0 ? 'empty' : ''} text-[10px] font-bold px-2 py-0.5 rounded-full ${p.stock > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {p.stock > 0 ? `${p.stock} stok` : 'Habis'}
+                  </span>
+                </div>
+                <h3 className="font-bold text-white text-sm mb-1 leading-snug">{p.name}</h3>
+                <p className="text-white/40 text-xs mb-4 leading-relaxed flex-1">{p.description}</p>
+                <div className="flex items-center justify-between mt-auto">
+                  <div>
+                    <div className="text-white font-black text-lg">Rp {p.price.toLocaleString()}</div>
+                    <div className="text-white/30 text-[10px]">{p.duration} {p.durationType}</div>
+                  </div>
+                  <button
+                    disabled={p.stock === 0}
+                    className={`btn-primary text-white text-xs font-bold px-4 py-2 rounded-xl ${p.stock === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    onClick={e => { e.stopPropagation(); p.stock > 0 && setModal({ id, ...p }) }}
+                  >
+                    Beli
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="fixed bottom-0 left-0 right-0 bg-[#0f0f1a]/95 backdrop-blur border-t border-white/5 py-3 px-4">
+        <div className="flex items-center justify-center gap-4 max-w-sm mx-auto">
+          {config.contacts?.wa && (
+            <a href={`https://wa.me/${config.contacts.wa}`} target="_blank" className="flex items-center gap-1.5 text-xs text-white/40 hover:text-emerald-400 transition font-medium">
+              <span>💬</span> WhatsApp
+            </a>
+          )}
+          {config.contacts?.tg && (
+            <a href={config.contacts.tg} target="_blank" className="flex items-center gap-1.5 text-xs text-white/40 hover:text-sky-400 transition font-medium">
+              <span>✈️</span> Telegram
+            </a>
+          )}
+          {config.contacts?.ch && (
+            <a href={config.contacts.ch} target="_blank" className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white transition font-medium">
+              <span>📢</span> Channel
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Modal Beli */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center modal-bg p-4" onClick={() => setModal(null)}>
+          <div
+            className="w-full max-w-sm bg-[#16162a] rounded-3xl overflow-hidden anim-up"
+            style={{ animationDelay: '0s' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <span className="text-4xl">{modal.emoji || '📦'}</span>
+                <div>
+                  <h2 className="font-black text-white text-base">{modal.name}</h2>
+                  <p className="text-white/40 text-xs">{modal.duration} {modal.durationType}</p>
+                </div>
+              </div>
+
+              <div className="bg-white/5 rounded-2xl p-4 mb-5">
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-white/40">Harga</span>
+                  <span className="text-white font-black">Rp {modal.price.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-white/30">Durasi</span>
+                  <span className="text-white/60">{modal.duration} {modal.durationType}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-5">
+                <div>
+                  <label className="text-xs font-bold text-white/50 uppercase tracking-wider mb-1.5 block">Nama Pembeli *</label>
+                  <input
+                    type="text"
+                    value={buyerName}
+                    onChange={e => setBuyerName(e.target.value)}
+                    placeholder="Nama kamu"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-indigo-500/60 placeholder-white/20 transition"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-white/50 uppercase tracking-wider mb-1.5 block">Telegram ID <span className="text-white/20 font-normal">(opsional, untuk notif)</span></label>
+                  <input
+                    type="text"
+                    value={tgId}
+                    onChange={e => setTgId(e.target.value)}
+                    placeholder="@username atau chat ID"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:border-indigo-500/60 placeholder-white/20 transition"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={buy}
+                disabled={loading || !buyerName.trim()}
+                className="btn-primary w-full py-3.5 rounded-xl text-white font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {loading ? '⏳ Memproses...' : `💳 Bayar Rp ${modal.price.toLocaleString()}`}
+              </button>
+              <button onClick={() => setModal(null)} className="w-full py-2.5 mt-2 text-white/30 text-xs font-medium hover:text-white/60 transition">Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />)
+</script>
+</body>
+</html>

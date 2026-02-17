@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pembayaran — DigiShop</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{font-family:'Plus Jakarta Sans',sans-serif}
+    body{background:#0f0f1a;min-height:100vh}
+    .anim-up{animation:up .4s cubic-bezier(.16,1,.3,1) forwards;opacity:0;transform:translateY(20px)}
+    @keyframes up{to{opacity:1;transform:translateY(0)}}
+    .pulse-ring{animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    .countdown{font-variant-numeric:tabular-nums}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React
+
+const App = () => {
+  const [data, setData] = useState(null)
+  const [qr, setQr] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [timer, setTimer] = useState(900) // 15 menit
+  const id = window.location.pathname.split('/').pop()
+
+  const check = async (silent = false) => {
+    if (!silent) setLoading(true)
+    try {
+      const res = await fetch(`/api/check/${id}`)
+      const json = await res.json()
+      if (!json.success) { window.location.href = '/history'; return }
+      if (json.data.status === 'completed') { window.location.href = `/success/${id}`; return }
+      if (json.data.status === 'canceled') { window.location.href = '/history'; return }
+      setData(json.data)
+      if (json.data.qrRaw && !qr) {
+        QRCode.toDataURL(json.data.qrRaw, { margin: 1, width: 320, color: { dark: '#000', light: '#fff' } }, (err, url) => {
+          if (!err) setQr(url)
+        })
+      }
+    } catch {}
+    if (!silent) setLoading(false)
+  }
+
+  useEffect(() => {
+    check()
+    const poll = setInterval(() => check(true), 5000)
+    const countdown = setInterval(() => setTimer(t => {
+      if (t <= 1) { clearInterval(countdown); return 0 }
+      return t - 1
+    }), 1000)
+    return () => { clearInterval(poll); clearInterval(countdown) }
+  }, [])
+
+  const cancel = async () => {
+    if (!confirm('Yakin ingin membatalkan order ini?')) return
+    await fetch('/api/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: id })
+    })
+    window.location.href = '/history'
+  }
+
+  const mins = String(Math.floor(timer / 60)).padStart(2, '0')
+  const secs = String(timer % 60).padStart(2, '0')
+
+  if (!data) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-white/30 text-sm font-medium">Memuat pembayaran...</p>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-sm anim-up">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <span className="text-4xl block mb-2">{data.productEmoji || '📦'}</span>
+          <h1 className="text-white font-black text-xl">{data.productName}</h1>
+          <p className="text-white/40 text-xs mt-1">{data.duration} {data.durationType} · {data.buyerName}</p>
+        </div>
+
+        {/* Card */}
+        <div className="bg-[#16162a] rounded-3xl overflow-hidden" style={{boxShadow:'0 0 0 1px rgba(99,102,241,.15),0 8px 40px rgba(0,0,0,.4)'}}>
+          {/* Amount */}
+          <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-6 text-center">
+            <p className="text-indigo-200/70 text-xs font-bold uppercase tracking-widest mb-1">Total Pembayaran</p>
+            <div className="text-white font-black text-4xl">Rp {data.amount.toLocaleString()}</div>
+          </div>
+
+          <div className="p-6">
+            {/* QR Code */}
+            <div className="flex justify-center mb-5">
+              {qr ? (
+                <div className="bg-white p-3 rounded-2xl shadow-inner">
+                  <img src={qr} className="w-52 h-52 object-contain" />
+                </div>
+              ) : (
+                <div className="bg-white/5 w-60 h-60 rounded-2xl flex items-center justify-center">
+                  <div className="w-8 h-8 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                </div>
+              )}
+            </div>
+
+            {/* Timer */}
+            <div className="flex items-center justify-center gap-2 mb-5">
+              <div className={`w-2 h-2 rounded-full ${timer > 0 ? 'bg-emerald-400 pulse-ring' : 'bg-red-400'}`}></div>
+              <span className={`countdown text-sm font-bold ${timer > 60 ? 'text-white/60' : 'text-red-400'}`}>
+                {timer > 0 ? `Berlaku ${mins}:${secs}` : 'Waktu habis'}
+              </span>
+            </div>
+
+            {/* Instruksi */}
+            <div className="bg-white/5 rounded-xl p-3 mb-5 text-xs text-white/40 space-y-1">
+              <p>1. Screenshot / save QR Code di atas</p>
+              <p>2. Buka aplikasi m-banking / e-wallet</p>
+              <p>3. Scan QRIS dan bayar sesuai nominal</p>
+              <p>4. Klik <b className="text-white/60">Cek Pembayaran</b> setelah selesai</p>
+            </div>
+
+            {/* Buttons */}
+            <button
+              onClick={() => check()}
+              disabled={loading}
+              className="w-full py-3.5 rounded-xl text-white font-bold text-sm mb-2 transition"
+              style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)',boxShadow:'0 4px 20px rgba(99,102,241,.3)'}}
+            >
+              {loading ? '⏳ Mengecek...' : '✅ Cek Pembayaran'}
+            </button>
+            <button
+              onClick={cancel}
+              className="w-full py-3 rounded-xl border border-white/10 text-white/30 text-xs font-bold hover:text-red-400 hover:border-red-500/30 transition"
+            >
+              Batalkan Order
+            </button>
+          </div>
+        </div>
+
+        <p className="text-center text-white/20 text-xs mt-4">Order ID: {data.orderId}</p>
+      </div>
+    </div>
+  )
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />)
+</script>
+</body>
+</html>

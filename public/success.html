@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Berhasil! — DigiShop</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{font-family:'Plus Jakarta Sans',sans-serif}
+    body{background:#0f0f1a;min-height:100vh}
+    .anim-up{animation:up .5s cubic-bezier(.16,1,.3,1) forwards;opacity:0;transform:translateY(24px)}
+    @keyframes up{to{opacity:1;transform:translateY(0)}}
+    .confetti{position:fixed;pointer-events:none;top:0;left:0;width:100%;height:100%;z-index:0}
+    .content{position:relative;z-index:1}
+    .credential-box{background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2)}
+    .copy-btn:active{transform:scale(.95)}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React
+
+const App = () => {
+  const [data, setData] = useState(null)
+  const [copied, setCopied] = useState(false)
+  const id = window.location.pathname.split('/').pop()
+
+  useEffect(() => {
+    fetch(`/api/order/${id}`).then(r => r.json()).then(json => {
+      if (json.success && json.data.status === 'completed') {
+        setData(json.data)
+      } else {
+        fetch(`/api/check/${id}`).then(r => r.json()).then(j => {
+          if (j.success) setData(j.data)
+        })
+      }
+    })
+  }, [])
+
+  const copy = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  if (!data) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-10 h-10 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+    </div>
+  )
+
+  const parseCredential = (cred) => {
+    if (!cred) return { email: null, password: null }
+    if (cred.includes(':')) {
+      const [email, ...rest] = cred.split(':')
+      return { email, password: rest.join(':') }
+    }
+    return { email: cred, password: null }
+  }
+
+  const { email, password } = parseCredential(data.credential)
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 content">
+      <div className="w-full max-w-sm anim-up">
+        {/* Success Icon */}
+        <div className="text-center mb-6">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+            <span className="text-4xl">✅</span>
+          </div>
+          <h1 className="text-white font-black text-2xl mb-1">Pembayaran Berhasil!</h1>
+          <p className="text-white/40 text-sm">Akun kamu sudah siap digunakan</p>
+        </div>
+
+        {/* Product Info */}
+        <div className="bg-[#16162a] rounded-2xl p-4 mb-4" style={{boxShadow:'0 0 0 1px rgba(99,102,241,.1)'}}>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-3xl">{data.productEmoji || '📦'}</span>
+            <div>
+              <p className="text-white font-bold text-sm">{data.productName}</p>
+              <p className="text-white/40 text-xs">{data.duration} {data.durationType}</p>
+            </div>
+          </div>
+          {data.expiredAt && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 text-xs text-amber-300">
+              📅 Berlaku hingga: <b>{data.expiredAt}</b>
+            </div>
+          )}
+        </div>
+
+        {/* Credential */}
+        <div className="credential-box rounded-2xl p-5 mb-4">
+          <p className="text-indigo-300/70 text-xs font-bold uppercase tracking-wider mb-3">🔑 Data Akun</p>
+
+          {email && (
+            <div className="mb-3">
+              <p className="text-white/30 text-[10px] font-bold uppercase mb-1">Email</p>
+              <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2.5">
+                <code className="text-indigo-300 text-sm font-bold flex-1 break-all">{email}</code>
+              </div>
+            </div>
+          )}
+
+          {password && (
+            <div className="mb-3">
+              <p className="text-white/30 text-[10px] font-bold uppercase mb-1">Password</p>
+              <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2.5">
+                <code className="text-indigo-300 text-sm font-bold flex-1 break-all">{password}</code>
+              </div>
+            </div>
+          )}
+
+          {!email && !password && data.credential && (
+            <div className="mb-3">
+              <p className="text-white/30 text-[10px] font-bold uppercase mb-1">Kredensial</p>
+              <div className="bg-white/5 rounded-xl px-3 py-2.5">
+                <code className="text-indigo-300 text-sm font-bold break-all">{data.credential}</code>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={() => copy(data.credential)}
+            className="copy-btn w-full py-2.5 rounded-xl text-sm font-bold transition mt-2"
+            style={{background:copied ? 'rgba(16,185,129,.15)' : 'rgba(99,102,241,.15)', border: copied ? '1px solid rgba(16,185,129,.3)' : '1px solid rgba(99,102,241,.3)', color: copied ? '#6ee7b7' : '#a5b4fc'}}
+          >
+            {copied ? '✅ Disalin!' : '📋 Salin Kredensial'}
+          </button>
+        </div>
+
+        {/* Warning */}
+        <div className="bg-red-500/5 border border-red-500/15 rounded-xl px-4 py-3 mb-5 text-xs text-red-300/70">
+          ⚠️ <b>Simpan data ini sekarang!</b> Data tidak akan muncul lagi setelah halaman ditutup. Screenshot atau catat segera.
+        </div>
+
+        {/* Actions */}
+        <a href="/"
+          className="block w-full py-3.5 rounded-xl text-center text-white font-bold text-sm transition"
+          style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)',boxShadow:'0 4px 20px rgba(99,102,241,.3)'}}
+        >
+          🛒 Belanja Lagi
+        </a>
+        <a href="/history" className="block w-full py-2.5 text-center text-white/30 text-xs font-medium mt-2 hover:text-white/60 transition">
+          Lihat Riwayat
+        </a>
+
+        <p className="text-center text-white/15 text-xs mt-4">Order: {data.orderId}</p>
+      </div>
+    </div>
+  )
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />)
+</script>
+</body>
+</html>
