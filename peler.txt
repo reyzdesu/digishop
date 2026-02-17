@@ -1,0 +1,20 @@
+PORT=3000
+
+# ── Toko ─────────────────────────────────────
+shopName=DigiShop
+
+# ── Pakasir (QRIS) ───────────────────────────
+pakasirSlug=
+pakasirApiKey=
+
+# ── Telegram Bot ─────────────────────────────
+telegramToken=          # Token bot dari @BotFather
+telegramAdminId=        # Chat ID kamu (cek di @userinfobot)
+
+# ── Webhook ──────────────────────────────────
+webhookUrl=https://domain-kamu.up.railway.app/api/webhook/pakasir
+
+# ── Kontak ───────────────────────────────────
+contactWa=628xxxx
+contactTg=https://t.me/username
+contactCh=https://whatsapp.com/channel/xxx
